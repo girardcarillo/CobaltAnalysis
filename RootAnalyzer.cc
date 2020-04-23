@@ -209,15 +209,15 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
         Delta_t = t_Emax - t_Emin ;
         htime->Fill(Delta_t) ;
 
-        // henergy_spectrum_Emin->Fill(Emin) ;
-        // henergy_spectrum_Emax->Fill(Emax) ;
+        henergy_spectrum_Emin->Fill(Emin) ;
+        henergy_spectrum_Emax->Fill(Emax) ;
         h2energy->Fill(Emin,Emax) ;
 
         for (int j = 0 ; j < calo_row->size() ; ++j) {
           //counting number of events for each PM
           counts[calo_column->at(j)][calo_row->at(j)]++ ;
 
-          // henergy_spectrum->Fill(calo_energy->at(j)) ;
+          henergy_spectrum->Fill(calo_energy->at(j)) ;
 
         }
 
@@ -227,14 +227,14 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
         bool selected_PMT = select_PM(calo_column,calo_row,selected_column,selected_row,&hit) ;
         if (selected_PMT) {
 
-          // test 17/04/2020 pour étudier efficacité du détecteur (comparaison simus/data dans le directory DetectorEfficiency)
-          if (calo_column->at(abs(hit-1))==9&&calo_row->at(abs(hit-1))==7) {
-            henergy_spectrum->Fill(calo_energy->at(hit)) ;
-            henergy_spectrum->Fill(calo_energy->at(abs(hit-1))) ;
-            henergy_spectrum_Emin->Fill(Emin) ;
-            henergy_spectrum_Emax->Fill(Emax) ;
-          }
-          //
+          // // test 17/04/2020 pour étudier efficacité du détecteur (comparaison simus/data dans le directory DetectorEfficiency)
+          // if (calo_column->at(abs(hit-1))==9&&calo_row->at(abs(hit-1))==7) {
+          //   henergy_spectrum->Fill(calo_energy->at(hit)) ;
+          //   henergy_spectrum->Fill(calo_energy->at(abs(hit-1))) ;
+          //   henergy_spectrum_Emin->Fill(Emin) ;
+          //   henergy_spectrum_Emax->Fill(Emax) ;
+          // }
+          // //
 
           // //// test with corrected times from reflecto (10/01/20)
           // for (int i=0; i<tree_correctedTimes->GetEntries(); i++){

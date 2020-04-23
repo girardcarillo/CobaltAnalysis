@@ -23,14 +23,20 @@ typedef numeric_limits<double> dbl ;
 const int row_tot_number=13 ;
 const int column_tot_number=20 ;
 
-void FitDeltat(TH1F* histo, double *fit_parameters) ;
-bool select_PM(vector<int> *vect_column,vector<int> *vect_row,int selected_column,int selected_row,int *hit) ;
-double distance_OM(int col1,int row1,int col2,int row2) ;
-double Median(vector<double> vect) ;
+void GenerateBdf(string run, double energy_cut_min=0,double energy_cut_max=0, bool enable_drawing = 0, bool enable_root_files = 0) ;
+bool CutRun (string run, int row0, int column0, int row1, int column1) ;
 
-void GenerateBdfRun(int selected_column,int selected_row,double energy_cut_min=0,double energy_cut_max=0, bool enable_drawing = 0, bool enable_root_files = 0){
+void GenerateBdfRun(string run, double energy_cut_min=0,double energy_cut_max=0, bool enable_drawing = 0, bool enable_root_files = 0){
 
-  string filename = "Cut_root_files/data/60Co_runs/Cut_2e_run184_Calib.root" ;
+  GenerateBdf(run, energy_cut_min, energy_cut_max, enable_drawing, enable_root_files) ;
+
+}
+
+
+
+void GenerateBdf(string run, double energy_cut_min=0,double energy_cut_max=0, bool enable_drawing = 0, bool enable_root_files = 0){
+
+  string filename = "Cut_root_files/data/60Co_runs/Cut_2e_run"+run+"_Calib.root" ;
 
   //data file
   TFile *DataFile = new TFile(filename.c_str(),"READ") ;
@@ -85,8 +91,13 @@ void GenerateBdfRun(int selected_column,int selected_row,double energy_cut_min=0
 
     else {
 
-      if ( calo_row->at(0) >= calo_column->at(0)-3) {
-        if (calo_row->at(1) >= calo_column->at(1)-3) {
+      // if ( calo_row->at(0) >= calo_column->at(0)) {
+      //   if (calo_row->at(1) >= calo_column->at(1)) {
+
+      if (CutRun(run,calo_row->at(0),calo_column->at(0),calo_row->at(1),calo_column->at(1))) {
+
+      // if ( calo_row->at(0) <= calo_column->at(0)) {
+      //   if (calo_row->at(1) <= calo_column->at(1)) {
 
 
           //Fill avec Emin/Emax
@@ -125,20 +136,11 @@ void GenerateBdfRun(int selected_column,int selected_row,double energy_cut_min=0
               henergy_spectrum->Fill(calo_energy->at(j)) ;
 
             }
-
-
-            //tableau coïncidences
-            int hit=-1 ;
-            bool selected_PMT = select_PM(calo_column,calo_row,selected_column,selected_row,&hit) ;
-            if (selected_PMT) {
-
-
-
-            }
           }
         }
-      }
-      // if (i > 1e6) {
+      //      }
+
+      // if (i > 1e2) {
       //   cout << "\033[1;31mwarning break at \033[0m" << i << endl ;
       //   break ;
       // }
@@ -155,17 +157,19 @@ void GenerateBdfRun(int selected_column,int selected_row,double energy_cut_min=0
 
       h2counts->SetBinContent(i+2,j+2,counts[i][j]) ;
 
-
     }
   }
 
-    // ///Drawing
+  // ///Drawing
+
+  string title ;
 
   if (enable_drawing) {
 
     TCanvas *c0 = new TCanvas("c0","c0",10,10,2000,1000) ;
     config_histo2D(h2counts, "Number of events in each PMT", "Column","Row","COLZ") ;
-    c0->SaveAs("plots_bkg/counts.pdf") ;
+    title = "plots_bkg/counts_run"+run+".pdf" ;
+    c0->SaveAs(title.c_str()) ;
 
 
     TCanvas *c1 = new TCanvas("c1","c1",10,10,2000,1000) ;
@@ -204,38 +208,50 @@ void GenerateBdfRun(int selected_column,int selected_row,double energy_cut_min=0
 
     c1->SetLogy() ;
     c1->BuildLegend(0.617,0.775,0.977,0.98) ;
-    c1->SaveAs("plots_bkg/energy_spectrum_emin_emax.pdf") ;
+    title = "plots_bkg/energy_spectrum_emin_emax_run"+run+".pdf" ;
+    c1->SaveAs(title.c_str()) ;
 
 
   }
 
   if (enable_root_files) {
 
+
     config_histo1D(henergy_spectrum,"","Energy (MeV)","#counts",2,1,1) ;
-    henergy_spectrum->SaveAs("DetectorEfficiency/histograms/data/bkg/energy_spectrum.root") ;
+    title  = "DetectorEfficiency/histograms/data/bkg/energy_spectrum_run"+run+".root" ;
+    henergy_spectrum->SaveAs(title.c_str()) ;
 
     config_histo1D(henergy_spectrum_Emin,"","Energy (MeV)","#counts",2,1,1) ;
-    henergy_spectrum_Emin->SaveAs("DetectorEfficiency/histograms/data/bkg/energy_spectrum_Emin.root") ;
+    title  = "DetectorEfficiency/histograms/data/bkg/energy_spectrum_Emin_run"+run+".root" ;
+    henergy_spectrum_Emin->SaveAs(title.c_str()) ;
 
     config_histo1D(henergy_spectrum_Emax,"","Energy (MeV)","#counts",2,1,1) ;
-    henergy_spectrum_Emax->SaveAs("DetectorEfficiency/histograms/data/bkg/energy_spectrum_Emax.root") ;
+    title  = "DetectorEfficiency/histograms/data/bkg/energy_spectrum_Emax_run"+run+".root" ;
+    henergy_spectrum_Emax->SaveAs(title.c_str()) ;
 
   }
-
 
 
   theTree->ResetBranchAddresses() ;
+
 }
 
-bool select_PM(vector<int> *vect_column,vector<int> *vect_row,int selected_column,int selected_row,int *hit){
-  bool flag_test=0 ;
-  for (int i = 0 ; i < vect_row->size() ; ++i) {
-    if (vect_column->at(i)==selected_column) {
-      if (vect_row->at(i)==selected_row) {
-        *hit=i ;
-        flag_test=1 ;
-      }
-    }
+
+bool CutRun (string run, int row0, int column0, int row1, int column1) {
+
+  bool cut = 0 ;
+  if (run == "185") {
+    cut = (row0 <= column0-3 && row1 <= column1-3) ;
   }
-  return flag_test ;
+  else if (run == "184") {
+    cut = (row0 >= column0-3 && row1 >= column1-3) ;
+  }
+
+  return cut ;
+
+
+      // if ( calo_row->at(0) >= calo_column->at(0)-3) {
+      //   if (calo_row->at(1) >= calo_column->at(1)-3) {
+
+
 }
