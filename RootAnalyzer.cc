@@ -11,6 +11,7 @@
 #include <TObject.h>
 #include <TH1.h>
 #include <TH2.h>
+#include <TRandom.h>
 
 #include "/home/girardcarillo/Workdir/SNPlot/RootDisplay.h"
 #include "/home/girardcarillo/Workdir/SNPlot/EventTree.h"
@@ -27,7 +28,7 @@ bool select_PM(vector<int> *vect_column,vector<int> *vect_row,int selected_colum
 double distance_OM(int col1,int row1,int col2,int row2) ;
 double Median(vector<double> vect) ;
 
-void RootAnalyzer(string filename,string correctedTimesFilename,int selected_column,int selected_row,double energy_cut_min=0,double energy_cut_max=0, bool enable_drawing = 0){
+void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected_column,int selected_row,double energy_cut_min=0,double energy_cut_max=0, bool enable_drawing = 0, double smearing_energy = 0){
   cout.precision(dbl::max_digits10) ;
   // TGaxis::SetMaxDigits(2) ;
 
@@ -43,17 +44,17 @@ void RootAnalyzer(string filename,string correctedTimesFilename,int selected_col
   tree_HV->SetBranchAddress("row_HV",&row_HV) ;
   tree_HV->SetBranchAddress("HV",&HV) ;
 
-  // corrected times from reflecto files
-  TTree *tree_correctedTimes = new TTree("ntuple_correctedTimes","corrected times from reflecto") ;
+  // // corrected times from reflecto files
+  // TTree *tree_correctedTimes = new TTree("ntuple_correctedTimes","corrected times from reflecto") ;
 
-  tree_correctedTimes->ReadFile(correctedTimesFilename.c_str(),"wall/I:col/I:row/I:CT/F") ;
+  // tree_correctedTimes->ReadFile(correctedTimesFilename.c_str(),"wall/I:col/I:row/I:CT/F") ;
 
-  Int_t wall,col,row ;
-  Float_t CT ;
-  tree_correctedTimes->SetBranchAddress("wall",&wall) ;
-  tree_correctedTimes->SetBranchAddress("col",&col) ;
-  tree_correctedTimes->SetBranchAddress("row",&row) ;
-  tree_correctedTimes->SetBranchAddress("CT",&CT) ;
+  // Int_t wall,col,row ;
+  // Float_t CT ;
+  // tree_correctedTimes->SetBranchAddress("wall",&wall) ;
+  // tree_correctedTimes->SetBranchAddress("col",&col) ;
+  // tree_correctedTimes->SetBranchAddress("row",&row) ;
+  // tree_correctedTimes->SetBranchAddress("CT",&CT) ;
 
   // sigma and energy files
   ofstream SigmaFile;
@@ -107,9 +108,9 @@ void RootAnalyzer(string filename,string correctedTimesFilename,int selected_col
   TH1F *hsigma_OM = new TH1F ("sigma vs OM","", 250, 0, 249) ;
 
   TH1F *htime = new TH1F("Delta_time","",150, -20, 20) ;
-  TH1F *henergy_spectrum = new TH1F("Total_energy_spectrum","",1000, 0, 3) ;
-  TH1F *henergy_spectrum_Emin = new TH1F("Energy spectrum Emin","",1000, 0, 3) ;
-  TH1F *henergy_spectrum_Emax = new TH1F("Energy spectrum Emax","",1000, 0, 3) ;
+  TH1F *henergy_spectrum = new TH1F("Total_energy_spectrum","",100, 0, 4) ;
+  TH1F *henergy_spectrum_Emin = new TH1F("Energy_spectrum_Emin","",100, 0, 4) ;
+  TH1F *henergy_spectrum_Emax = new TH1F("Energy_spectrum_Emax","",100, 0, 4) ;
   TH1F *hsigma = new TH1F("Fitted sigmas","",50, 0, 2) ;
 
   TH1F *hcoincidence[column_tot_number][row_tot_number] ;
@@ -140,6 +141,8 @@ void RootAnalyzer(string filename,string correctedTimesFilename,int selected_col
   int counter_event = 0 ;
   int counter_loop = 0 ;
 
+  TRandom *grandom1 = new TRandom(1234);
+
   for (Long64_t i=0 ;i<theTree->GetEntries() ;i++) {
     counter_loop++ ;
     theTree->GetEntry(i) ;
@@ -164,6 +167,10 @@ void RootAnalyzer(string filename,string correctedTimesFilename,int selected_col
       double t_Emin = 0., t_Emax = 0. ;
       double Delta_t = 0. ;
 
+      if (smearing_energy != 0) {
+        calo_energy->at(0) = calo_energy->at(0)+grandom1->Gaus(0,smearing_energy) ;
+        calo_energy->at(1) = calo_energy->at(1)+grandom1->Gaus(0,smearing_energy) ;
+      }
       if (calo_energy->at(0) < calo_energy->at(1)) {
         Emin = calo_energy->at(0) ; Emax = calo_energy->at(1) ;
         t_Emin = calo_time->at(0) ; t_Emax = calo_time->at(1) ;
@@ -202,15 +209,15 @@ void RootAnalyzer(string filename,string correctedTimesFilename,int selected_col
         Delta_t = t_Emax - t_Emin ;
         htime->Fill(Delta_t) ;
 
-        henergy_spectrum_Emin->Fill(Emin) ;
-        henergy_spectrum_Emax->Fill(Emax) ;
+        // henergy_spectrum_Emin->Fill(Emin) ;
+        // henergy_spectrum_Emax->Fill(Emax) ;
         h2energy->Fill(Emin,Emax) ;
 
         for (int j = 0 ; j < calo_row->size() ; ++j) {
           //counting number of events for each PM
           counts[calo_column->at(j)][calo_row->at(j)]++ ;
 
-          henergy_spectrum->Fill(calo_energy->at(j)) ;
+          // henergy_spectrum->Fill(calo_energy->at(j)) ;
 
         }
 
@@ -219,6 +226,15 @@ void RootAnalyzer(string filename,string correctedTimesFilename,int selected_col
         int hit=-1 ;
         bool selected_PMT = select_PM(calo_column,calo_row,selected_column,selected_row,&hit) ;
         if (selected_PMT) {
+
+          // test 17/04/2020 pour étudier efficacité du détecteur (comparaison simus/data dans le directory DetectorEfficiency)
+          if (calo_column->at(abs(hit-1))==9&&calo_row->at(abs(hit-1))==7) {
+            henergy_spectrum->Fill(calo_energy->at(hit)) ;
+            henergy_spectrum->Fill(calo_energy->at(abs(hit-1))) ;
+            henergy_spectrum_Emin->Fill(Emin) ;
+            henergy_spectrum_Emax->Fill(Emax) ;
+          }
+          //
 
           // //// test with corrected times from reflecto (10/01/20)
           // for (int i=0; i<tree_correctedTimes->GetEntries(); i++){
@@ -253,7 +269,7 @@ void RootAnalyzer(string filename,string correctedTimesFilename,int selected_col
 
       }
 
-      // if (i > 1e4) {
+      // if (i > 1e6) {
       //   cout << "\033[1;31mwarning break at \033[0m" << i << endl ;
       //   break ;
       // }
@@ -439,14 +455,18 @@ void RootAnalyzer(string filename,string correctedTimesFilename,int selected_col
 
   }
 
-  // htime->Draw() ; htime->GetXaxis()->SetTitle("Delta t (ns)") ; htime->GetYaxis()->SetTitle("#counts") ; c3->SaveAs("plots_data/delta_t.pdf") ;
+  string s_smearing_energy = to_string(smearing_energy) ;
+  config_histo1D(henergy_spectrum,"SAME","Energy (MeV)","#counts",2,1,1) ;
+  string title = "DetectorEfficiency/histograms/energy_spectrum_"+s_smearing_energy+".root" ;
+  henergy_spectrum->SaveAs(title.c_str()) ;
 
-  //  hsigma_HV->Draw() ; hsigma_HV->SetXTitle("HV applied") ; hsigma_HV->SetYTitle("sigma (ns)") ;
+  title = "DetectorEfficiency/histograms/energy_spectrum_Emin_"+s_smearing_energy+".root" ;
+  config_histo1D(henergy_spectrum_Emin,"SAME","Energy (MeV)","#counts",2,1,1) ;
+  henergy_spectrum_Emin->SaveAs(title.c_str()) ;
 
-  // hsigma_energy->Draw() ;
-
-  config_histo2D(h2counts, "Number of events in each PMT", "Column","Row","COLZ") ;
-  h2counts->SaveAs("histograms/map_counts.root") ;
+  title = "DetectorEfficiency/histograms/energy_spectrum_Emax_"+s_smearing_energy+".root" ;
+  config_histo1D(henergy_spectrum_Emax,"SAME","Energy (MeV)","#counts",2,1,1) ;
+  henergy_spectrum_Emax->SaveAs(title.c_str()) ;
 
   theTree->ResetBranchAddresses() ;
   SigmaFile.close() ;
