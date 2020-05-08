@@ -14,34 +14,40 @@
 
 using namespace std;
 
-void Efficiency_detector(const char* file_data_Emax,const char* file_data_Emin,const char* file_simus_Emax,const char* file_simus_Emin){
+void Efficiency_detector(const char* file_data,const char* file_simus){
 
-  TFile *theDataFileEmax = new TFile(file_data_Emax,"READ");
-  TH1F *henergy_data_Emax = (TH1F*)theDataFileEmax->Get("Energy_spectrum_Emax");
+  TFile *theDataFile = new TFile(file_data,"READ");
+  TH1F *henergy_data = (TH1F*)theDataFile->Get("Total_energy_spectrum");
 
-  TFile *theDataFileEmin = new TFile(file_data_Emin,"READ");
-  TH1F *henergy_data_Emin = (TH1F*)theDataFileEmin->Get("Energy_spectrum_Emin");
+  TFile *theSimusFile = new TFile(file_simus,"READ");
+  TH1F *henergy_simus = (TH1F*)theSimusFile->Get("Total_energy_spectrum");
 
-  TFile *theSimusFileEmax = new TFile(file_simus_Emax,"READ");
-  TH1F *henergy_simus_Emax = (TH1F*)theSimusFileEmax->Get("Energy_spectrum_Emax");
+  TFile *theBdfFile = new TFile("histograms/bkg/energy_spectrum_bkg.root","READ");
+  TH1F *henergy_bdf = (TH1F*)theBdfFile->Get("Total_energy_spectrum");
 
-  TFile *theSimusFileEmin = new TFile(file_simus_Emin,"READ");
-  TH1F *henergy_simus_Emin = (TH1F*)theSimusFileEmin->Get("Energy_spectrum_Emin");
+  double scale = 3.5 ;
+  henergy_simus->Scale(scale) ; // 7.2 pour 1e8 simus ; 0.72 pour 1e9 simus
+  // henergy_simus->Scale(0.72) ; // 7.2 pour 1e8 simus ; 0.72 pour 1e9 simus
 
-  henergy_simus_Emax->Scale(0.375) ; // 3.75 pour 1e8 simus ; 0.375 pour 1e9 simus
-  henergy_simus_Emin->Scale(0.375) ;
+  // sans scale efficiency
+  // henergy_data->SetMinimum(0.1);
+  // RatioCanvas(henergy_data, henergy_simus, "Data", "Simulations", "Energy (MeV)", "Data/Simus", "plots/Eff.pdf") ;
 
-  // avec scale efficiency:
-  // henergy_data_Emax->Scale(henergy_simus_Emax->GetEntries()*3.75/henergy_data_Emax->GetEntries()) ;
-  // henergy_data_Emin->Scale(henergy_simus_Emax->GetEntries()*3.75/henergy_data_Emax->GetEntries()) ;
-  // RatioCanvas(henergy_data_Emax, henergy_simus_Emax, "Data/efficiency", "Simulations", "Energy (MeV)", "Data/Simus", "plots/Eff_Emax.pdf") ;
-  // RatioCanvas(henergy_data_Emin, henergy_simus_Emin, "Data/efficiency", "Simulations", "Energy (MeV)", "Data/Simus", "plots/Eff_Emin.pdf") ;
+  gStyle->SetOptStat(0) ;
+  TCanvas *c = new TCanvas("c","c",10,10,2000,1000) ;
+  config_histo1D(henergy_data,"HIST","Energy (MeV)","",2,1,MultiPlotColors(0)) ;
+  config_histo1D(henergy_simus,"HISTSAME","Energy (MeV)","",2,1,MultiPlotColors(1)) ;
+  config_histo1D(henergy_bdf,"HISTSAME","Energy (MeV)","",2,1,MultiPlotColors(3)) ;
+  c->SetLogy() ;
+  auto legend = new TLegend(0.49,0.77,0.99,0.97);
+  legend->AddEntry(henergy_data,Form("Data+bdf: entries %1.f",henergy_data->GetEntries()),"l");
+  legend->AddEntry(henergy_simus,Form("Cobalt simulations: entries %1.f",henergy_simus->GetEntries()*scale),"l");
+  legend->AddEntry(henergy_bdf,Form("Bdf: entries %1.f",henergy_bdf->GetEntries()),"l");
+  legend->Draw();
+  c->SaveAs("plots/Comparison_simus_data_bdf.pdf") ;
 
-
-  // // sans scale efficiency
-  henergy_data_Emin->SetMinimum(0.1);
-  RatioCanvas(henergy_data_Emax, henergy_simus_Emax, "Data", "Simulations", "Energy (MeV)", "Data/Simus", "plots/Eff_Emax.pdf") ;
-  RatioCanvas(henergy_data_Emin, henergy_simus_Emin, "Data", "Simulations", "Energy (MeV)", "Data/Simus", "plots/Eff_Emin.pdf") ;
+  // // Compare simus GenerateBackgroundRun
+  // RatioCanvas(henergy_data, henergy_simus, "Cobalt simulations", "Topological cut", "Energy (MeV)", "Simus/Cut", "plots/Eff.pdf") ;
 
 
 }
