@@ -27,6 +27,7 @@ bool select_PM(vector<int> *vect_column,vector<int> *vect_row,int selected_colum
 bool select_cross(vector<int> *vect_column,vector<int> *vect_row,int selected_column,int selected_row) ;
 bool select_far(vector<int> *vect_column,vector<int> *vect_row,int selected_column,int selected_row,int hit) ;
 bool select_damaged(vector<int> *col,vector<int> *row) ;
+double distance_OM(int col1,int row1,int col2,int row2) ;
 
 void GenerateBdfRun(string type, string run, string filename, double energy_cut_min=0,double energy_cut_max=0, bool enable_drawing = 0, bool enable_root_files = 0){
 
@@ -104,7 +105,7 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
   TH1F *henergy_spectrum = new TH1F("Total_energy_spectrum","",100, 0, 4) ;
   TH1F *henergy_spectrum_Emin = new TH1F("Energy_spectrum_Emin","",100, 0, 4) ;
   TH1F *henergy_spectrum_Emax = new TH1F("Energy_spectrum_Emax","",100, 0, 4) ;
-
+  TProfile *hcounts_distance = new TProfile ("distance_stat","", 50, 0, 20, 0, 1e6) ;
 
   double counts[column_tot_number][row_tot_number] ;
   double coincidence[column_tot_number][row_tot_number] ;
@@ -151,63 +152,84 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
           flag_energy_inf=0 ;
         }
 
+        // take out damaged OMs
         bool flag_damaged = select_damaged(calo_column,calo_row) ;
 
 
-        // Sélectionner une croix autour de l'OM de référence [selected_column:selected_row]
-
-        if (flag_damaged) {
-          if (flag_energy_inf) {
-
-            //tableau coïncidences
-
-
-            for (int j = 0 ; j < calo_row->size() ; ++j) {
-              //counting number of events for each PM
-              counts[calo_column->at(j)][calo_row->at(j)]++ ;
+        bool flag_dead_fr = 1 ;
+        if (calo_column->at(0) == 6 || calo_row->at(0) == 5) {// on retire les trois OMs morts du côté FR
+          if (calo_column->at(0) == 8 || calo_row->at(0) == 5) {
+            if (calo_column->at(0) == 15 || calo_row->at(0) == 6) {
+              flag_dead_fr = 0 ;
             }
+          }
+        }
+        if (calo_column->at(1) == 6 || calo_row->at(1) == 5) {// on retire les trois OMs morts du côté FR
+          if (calo_column->at(1) == 8 || calo_row->at(1) == 5) {
+            if (calo_column->at(1) == 15 || calo_row->at(1) == 6) {
+              flag_dead_fr = 0 ;
+            }
+          }
+        }
+
+        // Sélectionner une croix autour de l'OM qu'on regarde
+        bool flag_neighbour = select_cross(calo_column,calo_row,calo_column->at(0),calo_row->at(0)) ;
 
 
-            int hit=-1 ;
-            bool selected_PMT = select_PM(calo_column,calo_row,selected_column,selected_row,&hit) ;
-            if (selected_PMT) {
-              //counting number of events in coincidence with reference OM, for each OM
+        if (flag_dead_fr) {
+          if (flag_damaged) {
+            if (flag_energy_inf) {
+              if (!flag_neighbour) {
 
-              bool flag_square = select_cross(calo_column,calo_row,selected_column,selected_row) ;
-              bool flag_far = select_far(calo_column,calo_row,selected_column,selected_row,abs(hit-1)) ;
-
-              //if (!flag_square) {
-                coincidence[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))]++ ;
-
-                counter_event++ ;
-                henergy_spectrum_Emin->Fill(Emin) ;
-                henergy_spectrum_Emax->Fill(Emax) ;
-                h2energy->Fill(Emin,Emax) ;
-
-                henergy_spectrum->Fill(calo_energy->at(hit)) ;
-                henergy_spectrum->Fill(calo_energy->at(abs(hit-1))) ;
+                //tableau coïncidences
 
 
-                // // test 04/05/20 : comparer les 4 OMs les plus proches de l'OM de ref avec les autres
-                // // plus loin
-                // if (flag_square) {
-                //   counter_near++;
-                //   henergy_spectrum_near->Fill(calo_energy->at(hit)) ;
-                //   henergy_spectrum_near->Fill(calo_energy->at(abs(hit-1))) ;
-                // }
-                // if (flag_far) {
-                //   counter_far++;
-                //   henergy_spectrum_far->Fill(calo_energy->at(hit)) ;
-                //   henergy_spectrum_far->Fill(calo_energy->at(abs(hit-1))) ;
-                // }
-                //
+                for (int j = 0 ; j < calo_row->size() ; ++j) {
+                  //counting number of events for each PM
+                  counts[calo_column->at(j)][calo_row->at(j)]++ ;
+                  // henergy_spectrum->Fill(calo_energy->at(j)) ;
+                }
+
+
+                int hit=-1 ;
+                bool selected_PMT = select_PM(calo_column,calo_row,selected_column,selected_row,&hit) ;
+                if (selected_PMT) {
+                  //counting number of events in coincidence with reference OM, for each OM
+
+                  bool flag_far = select_far(calo_column,calo_row,selected_column,selected_row,abs(hit-1)) ;
+
+                  coincidence[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))]++ ;
+
+                  counter_event++ ;
+                  // henergy_spectrum_Emin->Fill(Emin) ;
+                  // henergy_spectrum_Emax->Fill(Emax) ;
+                  // h2energy->Fill(Emin,Emax) ;
+
+                  henergy_spectrum->Fill(calo_energy->at(hit)) ;
+                  // henergy_spectrum->Fill(calo_energy->at(abs(hit-1))) ;
+
+
+                  // // test 04/05/20 : comparer les 4 OMs les plus proches de l'OM de ref avec les autres
+                  // // plus loin
+                  // if (flag_square) {
+                  //   counter_near++;
+                  //   henergy_spectrum_near->Fill(calo_energy->at(hit)) ;
+                  //   henergy_spectrum_near->Fill(calo_energy->at(abs(hit-1))) ;
+                  // }
+                  // if (flag_far) {
+                  //   counter_far++;
+                  //   henergy_spectrum_far->Fill(calo_energy->at(hit)) ;
+                  //   henergy_spectrum_far->Fill(calo_energy->at(abs(hit-1))) ;
+                  // }
+                  //
+
+                }
+
               }
-
             }
+          }
 
-          //}
-
-          // if (i > 1e2) {
+          // if (i > 1e4) {
           //   cout << "\033[1;31mwarning break at \033[0m" << i << endl ;
           //   break ;
           // }
@@ -218,7 +240,6 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
   }
 
   cout << counter_event << " selected on " << counter_loop << endl ;
-  cout << "counter far = " << counter_far << " counter_near = " << counter_near << endl ;
 
   for (int i = 0 ; i < column_tot_number ; ++i) {
     for (int j = 0 ; j< row_tot_number ; ++j) {
@@ -230,18 +251,18 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
       else {
         h2counts->SetBinContent(i+2,j+2,counts[i][j]) ;
         h2coincidence->SetBinContent(i+2,j+2,coincidence[i][j]) ;
+        hcounts_distance->Fill(distance_OM(selected_column, selected_row, i, j),counts[i][j]) ;
       }
 
     }
   }
 
-  // // norm simus
-  // henergy_spectrum_far->Scale(0.35) ;
-  // henergy_spectrum_near->Scale(0.35) ;
-  // TCanvas *c = new TCanvas("c","c",10,10,2000,1000) ;
-  // config_histo1D(henergy_spectrum_far,"HIST","Energy (MeV)","",2,1,2) ;
-  // config_histo1D(henergy_spectrum_near,"HISTSAME","Energy (MeV)","",2,1,1) ;
-  // c->BuildLegend();
+  if (run == "it_gauche" || run == "it_droite") {
+    h2counts->Scale(3.5) ; // simus 10e8
+    h2coincidence->Scale(3.5) ; // simus 10e8
+    hcounts_distance->Scale(3.5) ; // simus 10e8
+    henergy_spectrum->Scale(3.5) ; // simus 10e8
+  }
 
 
   // ///Drawing
@@ -251,9 +272,11 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
 
   if (enable_drawing) {
 
+    title = "root_files/counts/counts_"+type+"_run_"+run+".root" ;
+    h2counts->SaveAs(title.c_str()) ;
     TCanvas *c = new TCanvas("c","c",10,10,2000,1000) ;
-    config_histo2D(h2counts, "Number of events in each PMT", "Column","Row","COLZTEXT") ;
     title = "plots_"+type+"/counts_run"+run+".pdf" ;
+    config_histo2D(h2counts, "Number of events in each PMT", "Column","Row","COLZTEXT") ;
     c->SaveAs(title.c_str()) ;
 
     TCanvas *c0 = new TCanvas("c0","c0",10,10,2000,1000) ;
@@ -306,24 +329,38 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
     c2->SaveAs(title.c_str()) ;
 
 
-  }
+    TCanvas *c3 = new TCanvas("c3","c3",10,10,2000,1000) ;
+    gStyle->SetOptStat(0);
+    hcounts_distance->SaveAs(title.c_str()) ;
+    config_profile(hcounts_distance,"","Distance from source (a.u.)","#Counts","",2,MultiPlotColors(10)) ;
+    hcounts_distance->SetMarkerStyle(8) ;
+    c3->SetLogy() ;
+    TLine* line = new TLine(10,0,10,1.5e4) ;
+    line->SetLineStyle(2) ;
+    line->Draw("SAME") ;
+
+    // TLegend* l2 = new TLegend(0.53,0.77,0.80,0.84);
+    // l2->AddEntry((TObject*)0,Form("%1.f entries",),"");
+    // l2->Draw() ;
+    c3->SaveAs("plots_data/counts_distance.eps") ;}
+
 
   if (enable_root_files) {
 
     config_histo1D(henergy_spectrum,"","Energy (MeV)","#counts",2,1,1) ;
-    title  = "DetectorEfficiency/histograms/"+type+"/energy_spectrum_run"+run+".root" ;
+    title  = "root_files/energy/energy_"+type+"_run_"+run+".root" ;
     henergy_spectrum->SaveAs(title.c_str()) ;
 
-    config_histo1D(henergy_spectrum_Emin,"","Energy (MeV)","#counts",2,1,1) ;
-    title  = "DetectorEfficiency/histograms/"+type+"/energy_spectrum_Emin_run"+run+".root" ;
-    henergy_spectrum_Emin->SaveAs(title.c_str()) ;
+    // config_histo1D(henergy_spectrum_Emin,"","Energy (MeV)","#counts",2,1,1) ;
+    // title  = "root_files/energy/energy_spectrum_Emin_run"+run+".root" ;
+    // henergy_spectrum_Emin->SaveAs(title.c_str()) ;
 
-    config_histo1D(henergy_spectrum_Emax,"","Energy (MeV)","#counts",2,1,1) ;
-    title  = "DetectorEfficiency/histograms/"+type+"/energy_spectrum_Emax_run"+run+".root" ;
-    henergy_spectrum_Emax->SaveAs(title.c_str()) ;
+    // config_histo1D(henergy_spectrum_Emax,"","Energy (MeV)","#counts",2,1,1) ;
+    // title  = "root_files/energy/energy_spectrum_Emax_run"+run+".root" ;
+    // henergy_spectrum_Emax->SaveAs(title.c_str()) ;
 
-    title = "coincidence_"+type+"_run"+run+".root" ;
-    h2coincidence->SaveAs(title.c_str()) ;
+    // title = "coincidence_"+type+"_run"+run+".root" ;
+    // h2coincidence->SaveAs(title.c_str()) ;
 
   }
 
@@ -364,10 +401,12 @@ bool CutRun (string type, string run, int row0, int column0, int row1, int colum
       cut = (row0 <= column0-3 && row1 <= column1-3) ;
     }
     else if (run == "186" || run == "it_gauche") {
+      // cut = (column0 > 9 && column1 > 9) ; // c'était pour générer le plot du nombre de counts de la
+                                           // partie de droite quand la source est à gauche
       cut = (column0 <= 9 && column1 <= 9) ;
     }
     else if (run == "182") {
-      cut = (column0 >= 9 && column1 >= 9) ;
+      cut = (column0 > 9 && column1 > 9) ;
     }
     else if( run == "it_droite") {
       cut = (column0 < 9 && column1 < 9) ;
@@ -486,4 +525,12 @@ bool select_damaged(vector<int> *col,vector<int> *row){
   }
 
   return flag ;
+}
+
+
+
+double distance_OM(int col1,int row1,int col2,int row2){
+
+  return sqrt(pow((col2-col1),2)+pow((row2-row1),2)) ;
+
 }

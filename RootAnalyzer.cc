@@ -93,6 +93,7 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
   TH2D *h2energy = new TH2D ("energy","", 100, energy_cut_min, 4, 100, energy_cut_min, 4) ;
   TH2D *hdeltat = new TH2D ("delta t vs OM","", 290, 0, 289, 1000, -20, 20) ;
 
+  TProfile *hcounts_distance = new TProfile ("distance_stat","", 50, 0, 20, 0, 1e6) ;
   TProfile *hsigma_stat = new TProfile ("sigma vs stat","", 100, 0, 600, 0, 2) ;
   TProfile *hsigma_distance = new TProfile ("sigma vs distance","", 100, 0, 10, 0, 2) ;
   TProfile *hsigma_energy_max  = new TProfile("sigma_Emax","", 100, 0.5, 1.5, 0, 4);
@@ -137,13 +138,14 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
     }
   }
 
-  int counter_event = 0 ;
-  int counter_loop = 0 ;
 
   TRandom *grandom1 = new TRandom(1234);
 
+  int counter_tot = 0 ;
+  int eff_energy = 0 ;
+  int eff_square = 0 ;
+
   for (Long64_t i=0 ;i<theTree->GetEntries() ;i++) {
-    counter_loop++ ;
     theTree->GetEntry(i) ;
     if (i%1000000==0) cout << "event " << i << endl ;
 
@@ -153,13 +155,6 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
 
     else {
 
-      // // Calcul de energy avec charge (faire avec constantes de calib de Axel)
-      // bool flag_energy = 1 ;
-      // for (int i_energy = 0 ; i_energy < calo_energy->size() ; ++i_energy) {
-      //   if (calo_energy->at(i_energy)<energy_cut) {
-      //     flag_energy=0 ;
-      //   }
-      // }
 
       //Fill avec Emin/Emax
       double Emin = 0., Emax = 0. ;
@@ -185,12 +180,6 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
         flag_energy=0 ;
       }
 
-
-      bool flag_energy_sup = 1 ;
-      // if (Emax > 5) {
-      //   flag_energy_sup=0 ;
-      // }
-
       bool flag_damaged = select_damaged(calo_column,calo_row) ;
 
       bool flag_dead_fr = 1 ;
@@ -209,26 +198,31 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
         }
       }
 
+      bool flag_neighbour = select_cross(calo_column,calo_row,calo_column->at(0),calo_row->at(0)) ;
+
 
       // Sélectionner un carré autour de l'OM de référence [selected_column:selected_row]
-      bool flag_square=0 ;
-      if (calo_column->at(0)>selected_column-3&&calo_column->at(0)<selected_column+3) {
-        if (calo_row->at(0)>selected_row-3&&calo_row->at(0)<selected_row+3) {
-          if (calo_column->at(1)>selected_column-3&&calo_column->at(1)<selected_column+3) {
-            if (calo_row->at(1)>selected_row-3&&calo_row->at(1)<selected_row+3) {
-              flag_square=1 ;
-            }
-          }
-        }
-      }
+      // bool flag_square=0 ;
+      // if (calo_column->at(0)>selected_column-3&&calo_column->at(0)<selected_column+3) {
+      //   if (calo_row->at(0)>selected_row-3&&calo_row->at(0)<selected_row+3) {
+      //     if (calo_column->at(1)>selected_column-3&&calo_column->at(1)<selected_column+3) {
+      //       if (calo_row->at(1)>selected_row-3&&calo_row->at(1)<selected_row+3) {
+      //         flag_square=1 ;
+      //       }
+      //     }
+      //   }
+      // }
 
       if (flag_dead_fr) {
         if (flag_damaged) {
+          counter_tot++ ;
           if (flag_energy) {
-            if (flag_energy_sup) {
+            eff_energy++ ;
+            if (!flag_neighbour) {
+              eff_square++ ;
+
 
               //delta t à corriger des longueurs de cables coax (cf reflecto)!!
-              counter_event++ ;
               Delta_t = t_Emax - t_Emin ;
               htime->Fill(Delta_t) ;
 
@@ -244,61 +238,60 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
               bool selected_PMT = select_PM(calo_column,calo_row,selected_column,selected_row,&hit) ;
               if (selected_PMT) {
 
-                bool flag_square = select_cross(calo_column,calo_row,selected_column,selected_row) ;
-
-                if (!flag_square) {
-
-                  henergy_spectrum->Fill(calo_energy->at(hit)) ;
-                  // henergy_spectrum->Fill(calo_energy->at(abs(hit-1))) ;
-                  henergy_spectrum_Emin->Fill(Emin) ;
-                  henergy_spectrum_Emax->Fill(Emax) ;
-                  h2energy->Fill(Emin,Emax) ;
-
-                  // // test 17/04/2020 pour étudier efficacité du détecteur (comparaison simus/data dans le directory DetectorEfficiency)
-                  // if (calo_column->at(abs(hit-1))==9&&calo_row->at(abs(hit-1))==7) {
-                  //   henergy_spectrum->Fill(calo_energy->at(hit)) ;
-                  //   henergy_spectrum->Fill(calo_energy->at(abs(hit-1))) ;
-                  //   henergy_spectrum_Emin->Fill(Emin) ;
-                  //   henergy_spectrum_Emax->Fill(Emax) ;
-                  // }
-                  // //
-
-                  // //// test with corrected times from reflecto (10/01/20)
-                  // for (int i=0; i<tree_correctedTimes->GetEntries(); i++){
-                  //   tree_correctedTimes->GetEntry(i);
-                  //   // cout << "no corr: " << calo_time->at(0) << " " << calo_time->at(1) << endl ;
-                  //   if (col==calo_column->at(0)&&row==calo_row->at(0)) {
-                  //     calo_time->at(0) = calo_time->at(0) - CT ;
-                  //   }
-                  //   if (col==calo_column->at(1)&&row==calo_row->at(1)) {
-                  //     calo_time->at(1) = calo_time->at(1) - CT ;
-                  //   }
-                  //   // cout << "corr: " << calo_time->at(0) << " " << calo_time->at(1) << endl ;
-                  // }
-                  // ////
-
-
-                  double dt=calo_time->at(hit)-calo_time->at(abs(hit-1)) ;
-                  calo_coincidence[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))]++ ;
-                  delta_times[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))].push_back(dt) ;
-                  //hcoincidence[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))]->Fill(dt) ;
-                  one_PM_mean_energies[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))] += calo_energy->at(abs(hit-1)) ;
-
-                  min_energy[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))] += Emin ;
-                  max_energy[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))] += Emax ;
-
-                  //test 09/01/2020
-                  // hdeltat->Fill(calo_number->at(abs(hit-1)),dt) ;
-                  //
-
+                if (calo_column->at(abs(hit-1)) == 0 && calo_row->at(abs(hit-1)) == 7) {
+                  cout << "test" << endl ;
                 }
+
+                henergy_spectrum->Fill(calo_energy->at(hit)) ;
+                // henergy_spectrum->Fill(calo_energy->at(abs(hit-1))) ;
+                henergy_spectrum_Emin->Fill(Emin) ;
+                henergy_spectrum_Emax->Fill(Emax) ;
+                h2energy->Fill(Emin,Emax) ;
+
+                // // test 17/04/2020 pour étudier efficacité du détecteur (comparaison simus/data dans le directory DetectorEfficiency)
+                // if (calo_column->at(abs(hit-1))==9&&calo_row->at(abs(hit-1))==7) {
+                //   henergy_spectrum->Fill(calo_energy->at(hit)) ;
+                //   henergy_spectrum->Fill(calo_energy->at(abs(hit-1))) ;
+                //   henergy_spectrum_Emin->Fill(Emin) ;
+                //   henergy_spectrum_Emax->Fill(Emax) ;
+                // }
+                // //
+
+                // //// test with corrected times from reflecto (10/01/20)
+                // for (int i=0; i<tree_correctedTimes->GetEntries(); i++){
+                //   tree_correctedTimes->GetEntry(i);
+                //   // cout << "no corr: " << calo_time->at(0) << " " << calo_time->at(1) << endl ;
+                //   if (col==calo_column->at(0)&&row==calo_row->at(0)) {
+                //     calo_time->at(0) = calo_time->at(0) - CT ;
+                //   }
+                //   if (col==calo_column->at(1)&&row==calo_row->at(1)) {
+                //     calo_time->at(1) = calo_time->at(1) - CT ;
+                //   }
+                //   // cout << "corr: " << calo_time->at(0) << " " << calo_time->at(1) << endl ;
+                // }
+                // ////
+
+
+                double dt=calo_time->at(hit)-calo_time->at(abs(hit-1)) ;
+                calo_coincidence[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))]++ ;
+                delta_times[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))].push_back(dt) ;
+                //hcoincidence[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))]->Fill(dt) ;
+                one_PM_mean_energies[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))] += calo_energy->at(abs(hit-1)) ;
+
+                min_energy[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))] += Emin ;
+                max_energy[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))] += Emax ;
+
+                //test 09/01/2020
+                // hdeltat->Fill(calo_number->at(abs(hit-1)),dt) ;
+                //
+
               }
             }
           }
         }
       }
 
-      // if (i > 1e6) {
+      // if (i > 1e2) {
       //   cout << "\033[1;31mwarning break at \033[0m" << i << endl ;
       //   break ;
       // }
@@ -306,7 +299,7 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
     }
   }
 
-  cout << counter_event << " selected on " << counter_loop << endl ;
+  cout << "total = " << counter_tot << " cut energy = " << eff_energy << " cut voisins = " << eff_square << endl ;
 
   double mean = 0. ;
   double median = 0. ;
@@ -319,12 +312,12 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
 
   int OM_counter = 0 ;
   for (int i = 0 ; i < column_tot_number ; ++i) {
-    for (int j = 0 ; j< row_tot_number ; ++j) {
+    for (int j = 0 ; j < row_tot_number ; ++j) {
       OM_counter++ ;
 
       h2counts->SetBinContent(i+2,j+2,counts[i][j]) ;
       h2coincidence->SetBinContent(i+2,j+2,calo_coincidence[i][j]) ;
-
+      hcounts_distance->Fill(distance_OM(selected_column, selected_row, i, j),counts[i][j]) ;
 
       // filling deltat t histogram with tab
       mean = TMath::Mean(delta_times[i][j].begin(),delta_times[i][j].end()) ;
@@ -413,6 +406,7 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
 
   // ///Drawing
 
+
   if (enable_drawing) {
 
     // gStyle->SetOptStat(1110) ;
@@ -450,6 +444,28 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
     config_histo2D(h2energy, "E_{max} vs E_{min}", "E_{min}","E_{max}","COLZ") ;c3->SaveAs("plots_data/Emin_Emax.pdf") ;
     config_histo2D(h2counts, "Number of events in each PMT", "Column","Row","COLZTEXT") ;c3->SaveAs("plots_data/counts.pdf") ;
     config_histo2D(h2energy_spectrum_one_PM,Form("Mean energie for each PM in coincidence with OM [%d:%d]", selected_column, selected_row), "Column","Row","COLZTEXT") ;c3->SaveAs("plots_data/energy_one_PM.pdf") ;
+
+    // histogram for manuscrit thesis
+    c3->cd() ;
+    cout << "!scale for simus!!" << endl ;
+    hcounts_distance->Scale(3.5) ; // pour simus 10e8
+    hcounts_distance->SaveAs("BackgroundEstimation/tot_counts_distance.root") ;
+    gStyle->SetOptStat(0);
+    config_profile(hcounts_distance,"","Distance from source (a.u.)","#Counts","",2,MultiPlotColors(10)) ;
+    hcounts_distance->SetMarkerStyle(8) ;
+    c3->SetLogy() ;
+    TLine* line = new TLine(10,0,10,1.5e4) ;
+    line->SetLineStyle(2) ;
+    line->Draw("SAME") ;
+
+    TLegend* l1 = new TLegend(0.20,0.77,0.47,0.84);
+    l1->AddEntry((TObject*)0,Form("%1.f entries",57592*3.5),"");
+    l1->Draw() ;
+
+    TLegend* l2 = new TLegend(0.53,0.77,0.80,0.84);
+    l2->AddEntry((TObject*)0,Form("%1.f entries",4204*3.5),"");
+    l2->Draw() ;
+    c3->SaveAs("plots_data/counts_distance.eps") ;
 
 
     TCanvas *c4 = new TCanvas("c4","c4",10,10,2000,1000) ;
@@ -492,18 +508,9 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
 
 
 
-  // string s_smearing_energy = to_string(int(smearing_energy)) ;
-  // config_histo1D(henergy_spectrum,"SAME","Energy (MeV)","#counts",2,1,1) ;
-  // string title = "DetectorEfficiency/histograms/energy_spectrum_"+s_smearing_energy+".root" ;
-  // henergy_spectrum->SaveAs(title.c_str()) ;
-
-  // title = "DetectorEfficiency/histograms/energy_spectrum_Emin_"+s_smearing_energy+".root" ;
-  // config_histo1D(henergy_spectrum_Emin,"SAME","Energy (MeV)","#counts",2,1,1) ;
-  // henergy_spectrum_Emin->SaveAs(title.c_str()) ;
-
-  // title = "DetectorEfficiency/histograms/energy_spectrum_Emax_"+s_smearing_energy+".root" ;
-  // config_histo1D(henergy_spectrum_Emax,"SAME","Energy (MeV)","#counts",2,1,1) ;
-  // henergy_spectrum_Emax->SaveAs(title.c_str()) ;
+  henergy_spectrum->SaveAs(Form("DetectorEfficiency/histograms/energy_spectrum_%d.root",(int)smearing_energy)) ;
+  henergy_spectrum_Emin->SaveAs(Form("DetectorEfficiency/histograms/energy_spectrum_Emin_%d.root",(int)smearing_energy)) ;
+  henergy_spectrum_Emax->SaveAs(Form("DetectorEfficiency/histograms/energy_spectrum_Emax_%d.root",(int)smearing_energy)) ;
 
   hdeltat_ex->SaveAs(Form("DetectorEfficiency/DeltatAnalysis/deltat_%d-%d.root",selected_column,selected_row)) ;
   h2mean->SaveAs(Form("DetectorEfficiency/MeanAnalysis/deltat_%d-%d.root",selected_column,selected_row)) ;
@@ -513,6 +520,9 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
   SigmaFile.close() ;
   EnergyFile.close() ;
 }
+
+
+
 
 bool select_PM(vector<int> *vect_column,vector<int> *vect_row,int selected_column,int selected_row,int *hit){
   bool flag_test=0 ;
