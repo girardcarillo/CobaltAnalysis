@@ -38,7 +38,7 @@ void ElectronInteraction(){
     v_energy.push_back(energy) ;
     v_col.push_back(col) ;
     v_rad.push_back(rad) ;
-    v_tot.push_back(tot) ;
+    v_tot.push_back(1/tot) ;
   }
 
   int size = v_energy.size() ;

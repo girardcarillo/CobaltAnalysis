@@ -28,6 +28,7 @@ bool select_cross(vector<int> *vect_column,vector<int> *vect_row,int selected_co
 bool select_far(vector<int> *vect_column,vector<int> *vect_row,int selected_column,int selected_row,int hit) ;
 bool select_damaged(vector<int> *col,vector<int> *row) ;
 double distance_OM(int col1,int row1,int col2,int row2) ;
+TH1F* Create_norm_map(int col, int row) ;
 
 void GenerateBdfRun(string type, string run, string filename, double energy_cut_min=0,double energy_cut_max=0, bool enable_drawing = 0, bool enable_root_files = 0){
 
@@ -41,6 +42,8 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
 
   int selected_column = -1 ;
   int selected_row = -1 ;
+
+  TH1F *htest = Create_norm_map(selected_column,selected_row) ;
 
   if (run == "186") {
     if (type == "data") {
@@ -105,7 +108,8 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
   TH1F *henergy_spectrum = new TH1F("Total_energy_spectrum","",100, 0, 4) ;
   TH1F *henergy_spectrum_Emin = new TH1F("Energy_spectrum_Emin","",100, 0, 4) ;
   TH1F *henergy_spectrum_Emax = new TH1F("Energy_spectrum_Emax","",100, 0, 4) ;
-  TProfile *hcounts_distance = new TProfile ("distance_stat","", 50, 0, 20, 0, 1e6) ;
+  TH1F *hcounts_distance = new TH1F("distance_stat","", 25, 0, 20) ;
+  // TProfile *hcounts_distance = new TProfile("distance_stat","", 20, 0, 20, 0, 1e6) ;
 
   double counts[column_tot_number][row_tot_number] ;
   double coincidence[column_tot_number][row_tot_number] ;
@@ -190,15 +194,22 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
                   // henergy_spectrum->Fill(calo_energy->at(j)) ;
                 }
 
+                double distance0 = 0. ;
+                double distance1 = 0. ;
+                distance0 = distance_OM(selected_column,selected_row,calo_column->at(0),calo_row->at(0)) ;
+                distance1 = distance_OM(selected_column,selected_row,calo_column->at(1),calo_row->at(1)) ;
+                hcounts_distance->Fill(distance1) ;
+
 
                 int hit=-1 ;
                 bool selected_PMT = select_PM(calo_column,calo_row,selected_column,selected_row,&hit) ;
                 if (selected_PMT) {
                   //counting number of events in coincidence with reference OM, for each OM
+                  coincidence[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))]++ ;
+
 
                   bool flag_far = select_far(calo_column,calo_row,selected_column,selected_row,abs(hit-1)) ;
 
-                  coincidence[calo_column->at(abs(hit-1))][calo_row->at(abs(hit-1))]++ ;
 
                   counter_event++ ;
                   // henergy_spectrum_Emin->Fill(Emin) ;
@@ -251,7 +262,6 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
       else {
         h2counts->SetBinContent(i+2,j+2,counts[i][j]) ;
         h2coincidence->SetBinContent(i+2,j+2,coincidence[i][j]) ;
-        hcounts_distance->Fill(distance_OM(selected_column, selected_row, i, j),counts[i][j]) ;
       }
 
     }
@@ -260,20 +270,37 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
   if (run == "it_gauche" || run == "it_droite") {
     h2counts->Scale(3.5) ; // simus 10e8
     h2coincidence->Scale(3.5) ; // simus 10e8
-    hcounts_distance->Scale(3.5) ; // simus 10e8
     henergy_spectrum->Scale(3.5) ; // simus 10e8
+    hcounts_distance->Scale(3.5) ;
   }
 
 
-  // ///Drawing
 
+  TCanvas *c = new TCanvas("c","c",10,10,2000,1000) ;
+
+  hcounts_distance->Multiply(htest) ;
+  hcounts_distance->Draw() ;
+  // THStack *hs = new THStack("hs","");
+  // hs->Add(hcounts_distance,"E") ;
+  hcounts_distance->SetLineColor(kMagenta+2) ;
+  // hcounts_distance->SetFillColor(0) ;
+  // hs->Add(htest,"HIST") ;
+  // htest->SetLineColor(kOrange+7) ;
+  // htest->SetFillColor(0) ;
+  // hs->Draw("nostack");
+
+  // *tmp = (*htest)*(*hcounts_distance) ;
+
+  c->BuildLegend(0.617,0.775,0.977,0.98) ;
+
+
+
+  // ///Drawing
 
   string title ;
 
   if (enable_drawing) {
 
-    title = "root_files/counts/counts_"+type+"_run_"+run+".root" ;
-    h2counts->SaveAs(title.c_str()) ;
     TCanvas *c = new TCanvas("c","c",10,10,2000,1000) ;
     title = "plots_"+type+"/counts_run"+run+".pdf" ;
     config_histo2D(h2counts, "Number of events in each PMT", "Column","Row","COLZTEXT") ;
@@ -328,21 +355,7 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
     config_histo2D(h2energy, "E_{max} vs E_{min}", "E_{min}","E_{max}","COLZ") ;
     c2->SaveAs(title.c_str()) ;
 
-
-    TCanvas *c3 = new TCanvas("c3","c3",10,10,2000,1000) ;
-    gStyle->SetOptStat(0);
-    hcounts_distance->SaveAs(title.c_str()) ;
-    config_profile(hcounts_distance,"","Distance from source (a.u.)","#Counts","",2,MultiPlotColors(10)) ;
-    hcounts_distance->SetMarkerStyle(8) ;
-    c3->SetLogy() ;
-    TLine* line = new TLine(10,0,10,1.5e4) ;
-    line->SetLineStyle(2) ;
-    line->Draw("SAME") ;
-
-    // TLegend* l2 = new TLegend(0.53,0.77,0.80,0.84);
-    // l2->AddEntry((TObject*)0,Form("%1.f entries",),"");
-    // l2->Draw() ;
-    c3->SaveAs("plots_data/counts_distance.eps") ;}
+  }
 
 
   if (enable_root_files) {
@@ -350,6 +363,13 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
     config_histo1D(henergy_spectrum,"","Energy (MeV)","#counts",2,1,1) ;
     title  = "root_files/energy/energy_"+type+"_run_"+run+".root" ;
     henergy_spectrum->SaveAs(title.c_str()) ;
+
+    title  = "root_files/tprofiles/tprofile_"+type+"_run_"+run+".root" ;
+    hcounts_distance->SaveAs(title.c_str()) ;
+
+    title = "root_files/counts/counts_"+type+"_run_"+run+".root" ;
+    h2counts->SaveAs(title.c_str()) ;
+
 
     // config_histo1D(henergy_spectrum_Emin,"","Energy (MeV)","#counts",2,1,1) ;
     // title  = "root_files/energy/energy_spectrum_Emin_run"+run+".root" ;
@@ -365,6 +385,8 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
   }
 
   theTree->ResetBranchAddresses() ;
+
+  Create_norm_map(0,6) ;
 
 }
 
@@ -409,7 +431,7 @@ bool CutRun (string type, string run, int row0, int column0, int row1, int colum
       cut = (column0 > 9 && column1 > 9) ;
     }
     else if( run == "it_droite") {
-      cut = (column0 < 9 && column1 < 9) ;
+      cut = (column0 <= 9 && column1 <= 9) ;
     }
     else {
       cout << "From function CutRun: no cut config!!" << endl ;
@@ -532,5 +554,75 @@ bool select_damaged(vector<int> *col,vector<int> *row){
 double distance_OM(int col1,int row1,int col2,int row2){
 
   return sqrt(pow((col2-col1),2)+pow((row2-row1),2)) ;
+
+}
+
+TH1F* Create_norm_map(int col, int row){
+
+  TH1F *histo = new TH1F("histo","", 25, 0, 20) ;
+  TH1F *histo1 = new TH1F("histo1","", 25, 0, 20) ;
+
+  // TH2D *h2wall = new TH2D ("wall","",  column_tot_number+2, -1, column_tot_number+1, row_tot_number+2, -1, row_tot_number+1) ;
+  // for (int i = 0; i < column_tot_number; ++i) {
+  //   for (int j = 0; j < row_tot_number; ++j) {
+  //     h2wall->SetBinContent(i+2,j+2,distance_OM(col,row,i,j)) ;
+  //   }
+  // }
+
+
+  bool flag = 1 ;
+  for (int i = 0; i < column_tot_number; ++i) {
+    for (int j = 0; j < row_tot_number; ++j) {
+
+      flag = 1 ;
+
+      if (i == col) {
+        if (j == row+1) {
+          flag=0 ;
+        }
+      }
+      if (i == col+1) {
+        if (j == row) {
+          flag=0 ;
+        }
+      }
+      if (i == col) {
+        if (j == row-1) {
+          flag=0 ;
+        }
+      }
+      if (i == col-1) {
+        if (j == row) {
+          flag=0 ;
+        }
+      }
+
+      if (flag) {
+        histo->Fill(distance_OM(col,row,i,j)) ;
+        //cout << i << " " << j << " " << col << " " << row << " " << distance_OM(col,row,i,j) << endl ;
+      }
+    }
+  }
+
+
+  histo->Scale(1./histo->GetMaximum()) ;
+
+  for (int i = 0; i < 26; ++i) {
+    if (histo->GetBinContent(i) != 0) {
+      histo1->SetBinContent(i,1./histo->GetBinContent(i)) ;
+    }
+    else {
+      histo1->SetBinContent(i,0) ;
+    }
+  }
+
+
+  // TCanvas *c = new TCanvas("c","c",10,10,2000,1000) ;
+
+  // histo1->Draw() ;  histo->Draw("same") ;
+  // histo1->SetLineColor(2) ;
+  // c->BuildLegend(0.617,0.775,0.977,0.98) ;
+
+  return histo ;
 
 }

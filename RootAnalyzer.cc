@@ -90,7 +90,9 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
   TH2D *h2coincidence = new TH2D ("coincidence","", column_tot_number+2, -1, column_tot_number+1, row_tot_number+2, -1, row_tot_number+1) ;
   TH2D *h2sigmaError = new TH2D ("sigma_error","", column_tot_number+2, -1, column_tot_number+1, row_tot_number+2, -1, row_tot_number+1) ;
   TH2D *h2sigma = new TH2D ("sigma","", column_tot_number+2, -1, column_tot_number+1, row_tot_number+2, -1, row_tot_number+1) ;
-  TH2D *h2energy = new TH2D ("energy","", 100, energy_cut_min, 4, 100, energy_cut_min, 4) ;
+  // test 28/05/20
+  // TH2D *h2energy = new TH2D ("energy","", 100, energy_cut_min, 4, 100, energy_cut_min, 4) ;
+  TH2D *h2energy = new TH2D ("energy","", 100, 0, 1.5, 100, 0, 2.5) ;
   TH2D *hdeltat = new TH2D ("delta t vs OM","", 290, 0, 289, 1000, -20, 20) ;
 
   TProfile *hcounts_distance = new TProfile ("distance_stat","", 50, 0, 20, 0, 1e6) ;
@@ -232,6 +234,8 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
                 counts[calo_column->at(j)][calo_row->at(j)]++ ;
               }
 
+              // test 28/05/20
+               h2energy->Fill(Emin,Emax) ;
 
               //tableau coïncidences
               int hit=-1 ;
@@ -246,7 +250,7 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
                 // henergy_spectrum->Fill(calo_energy->at(abs(hit-1))) ;
                 henergy_spectrum_Emin->Fill(Emin) ;
                 henergy_spectrum_Emax->Fill(Emax) ;
-                h2energy->Fill(Emin,Emax) ;
+                // h2energy->Fill(Emin,Emax) ;
 
                 // // test 17/04/2020 pour étudier efficacité du détecteur (comparaison simus/data dans le directory DetectorEfficiency)
                 // if (calo_column->at(abs(hit-1))==9&&calo_row->at(abs(hit-1))==7) {
@@ -404,6 +408,8 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
   }
   //  }
 
+
+
   // ///Drawing
 
 
@@ -440,10 +446,51 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
     config_histo2D(h2coincidence,Form("Coincidences with OM [%d,%d]",selected_column,selected_row),"column","row","COLZTEXT") ;//c2->SaveAs("plots_data/coincidence.pdf") ;
     c2->SaveAs("plots_data/4_plots.pdf") ;
 
-    TCanvas *c3 = new TCanvas("c3","c3",10,10,2000,1000) ;
-    config_histo2D(h2energy, "E_{max} vs E_{min}", "E_{min}","E_{max}","COLZ") ;c3->SaveAs("plots_data/Emin_Emax.pdf") ;
-    config_histo2D(h2counts, "Number of events in each PMT", "Column","Row","COLZTEXT") ;c3->SaveAs("plots_data/counts.pdf") ;
-    config_histo2D(h2energy_spectrum_one_PM,Form("Mean energie for each PM in coincidence with OM [%d:%d]", selected_column, selected_row), "Column","Row","COLZTEXT") ;c3->SaveAs("plots_data/energy_one_PM.pdf") ;
+
+  TCanvas *c3 = new TCanvas("c3", "c3",67,57,1500,1000);
+  gStyle->SetOptStat(0);
+  c3->Range(-0.8659958,-0.3510379,3.101165,2.612943);
+  c3->SetFillColor(0);
+  c3->SetBorderMode(0);
+  c3->SetBorderSize(2);
+  c3->SetLeftMargin(0.2182911);
+  c3->SetRightMargin(0.1515354);
+  c3->SetTopMargin(0.03810504);
+  c3->SetBottomMargin(0.1184346);
+  c3->SetFrameBorderMode(0);
+  c3->SetFrameBorderMode(0);
+  gStyle->SetPalette(20,python_viridis) ;
+  c3->SetLogz();
+
+  TLine* line0 = new TLine(0.15,0,0.15,2.5) ;
+  line0->SetLineStyle(3) ;
+  line0->SetLineWidth(1) ;
+  TLine* line1 = new TLine(0,0.15,1.5,0.15) ;
+  line1->SetLineStyle(3) ;
+  line1->SetLineWidth(1) ;
+  TLine* line2 = new TLine(0.7,0,0.7,2.5) ;
+  line2->SetLineStyle(7) ;
+  line2->SetLineWidth(2) ;
+  TLine* line3 = new TLine(0,0.7,1.5,0.7) ;
+  line3->SetLineStyle(7) ;
+  line3->SetLineWidth(2) ;
+  h2energy->Scale(0.35) ; // pour simus 1e9 events
+  config_histo2D(h2energy, "", "Energy (MeV)","Energy (MeV)","COLZ") ;c3->SaveAs("plots_data/Emin_Emax.pdf") ;
+  h2energy->GetXaxis()->SetLabelSize(0.05);
+  h2energy->GetXaxis()->SetTitleOffset(1.2);
+  h2energy->GetYaxis()->SetLabelSize(0.05);
+  h2energy->GetZaxis()->SetLabelSize(0.05);
+  h2energy->SetContour(99) ;
+
+  line0->Draw("SAME") ;
+  line1->Draw("SAME") ;
+  line2->Draw("SAME") ;
+  line3->Draw("SAME") ;
+
+  c3->SaveAs("plots_data/Emin_Emax.pdf") ;
+
+  config_histo2D(h2counts, "Number of events in each PMT", "Column","Row","COLZTEXT") ;c3->SaveAs("plots_data/counts.pdf") ;
+  config_histo2D(h2energy_spectrum_one_PM,Form("Mean energie for each PM in coincidence with OM [%d:%d]", selected_column, selected_row), "Column","Row","COLZTEXT") ;c3->SaveAs("plots_data/energy_one_PM.pdf") ;
 
     // histogram for manuscrit thesis
     c3->cd() ;
