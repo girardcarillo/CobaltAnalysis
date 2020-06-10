@@ -28,11 +28,15 @@ bool select_cross(vector<int> *vect_column,vector<int> *vect_row,int selected_co
 bool select_far(vector<int> *vect_column,vector<int> *vect_row,int selected_column,int selected_row,int hit) ;
 bool select_damaged(vector<int> *col,vector<int> *row) ;
 double distance_OM(int col1,int row1,int col2,int row2) ;
-TH1F* Create_norm_map(int col, int row) ;
+// TH1F* Create_norm_map(int col, int row) ;
+double Create_norm_map(int col_source, int row_source, int col, int row) ;
 
 void GenerateBdfRun(string type, string run, string filename, double energy_cut_min=0,double energy_cut_max=0, bool enable_drawing = 0, bool enable_root_files = 0){
 
   GenerateBdf(type, run, filename, energy_cut_min, energy_cut_max, enable_drawing, enable_root_files) ;
+  int col_source = 0 ;
+  int row_source = 6 ;
+  Create_norm_map(col_source, row_source, 9,6) ;
 
 }
 
@@ -43,7 +47,6 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
   int selected_column = -1 ;
   int selected_row = -1 ;
 
-  TH1F *htest = Create_norm_map(selected_column,selected_row) ;
 
   if (run == "186") {
     if (type == "data") {
@@ -110,6 +113,7 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
   TH1F *henergy_spectrum_Emax = new TH1F("Energy_spectrum_Emax","",100, 0, 4) ;
   TH1F *hcounts_distance = new TH1F("distance_stat","", 25, 0, 20) ;
   // TProfile *hcounts_distance = new TProfile("distance_stat","", 20, 0, 20, 0, 1e6) ;
+  // TH1F *htest = Create_norm_map(selected_column,selected_row) ;
 
   double counts[column_tot_number][row_tot_number] ;
   double coincidence[column_tot_number][row_tot_number] ;
@@ -240,10 +244,10 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
             }
           }
 
-          // if (i > 1e4) {
-          //   cout << "\033[1;31mwarning break at \033[0m" << i << endl ;
-          //   break ;
-          // }
+          if (i > 1e4) {
+            cout << "\033[1;31mwarning break at \033[0m" << i << endl ;
+            break ;
+          }
 
         }
       }
@@ -276,22 +280,28 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
 
 
 
-  TCanvas *c = new TCanvas("c","c",10,10,2000,1000) ;
+  // TCanvas *c = new TCanvas("c","c",10,10,2000,1000) ;
 
-  hcounts_distance->Multiply(htest) ;
-  hcounts_distance->Draw() ;
-  // THStack *hs = new THStack("hs","");
-  // hs->Add(hcounts_distance,"E") ;
-  hcounts_distance->SetLineColor(kMagenta+2) ;
-  // hcounts_distance->SetFillColor(0) ;
-  // hs->Add(htest,"HIST") ;
-  // htest->SetLineColor(kOrange+7) ;
-  // htest->SetFillColor(0) ;
-  // hs->Draw("nostack");
+  // htest->Draw() ;
+  // TLine* line = new TLine(10,0,10,18) ;
+  // line->SetLineStyle(2) ;
+  // line->Draw("SAME") ;
 
-  // *tmp = (*htest)*(*hcounts_distance) ;
 
-  c->BuildLegend(0.617,0.775,0.977,0.98) ;
+  // hcounts_distance->Multiply(htest) ;
+  // hcounts_distance->Draw() ;
+  // // THStack *hs = new THStack("hs","");
+  // // hs->Add(hcounts_distance,"E") ;
+  // hcounts_distance->SetLineColor(kMagenta+2) ;
+  // // hcounts_distance->SetFillColor(0) ;
+  // // hs->Add(htest,"HIST") ;
+  // // htest->SetLineColor(kOrange+7) ;
+  // // htest->SetFillColor(0) ;
+  // // hs->Draw("nostack");
+
+  // // *tmp = (*htest)*(*hcounts_distance) ;
+
+  // c->BuildLegend(0.617,0.775,0.977,0.98) ;
 
 
 
@@ -386,7 +396,6 @@ void GenerateBdf(string type, string run, string filename, double energy_cut_min
 
   theTree->ResetBranchAddresses() ;
 
-  Create_norm_map(0,6) ;
 
 }
 
@@ -551,78 +560,137 @@ bool select_damaged(vector<int> *col,vector<int> *row){
 
 
 
+
 double distance_OM(int col1,int row1,int col2,int row2){
 
   return sqrt(pow((col2-col1),2)+pow((row2-row1),2)) ;
 
 }
 
-TH1F* Create_norm_map(int col, int row){
-
-  TH1F *histo = new TH1F("histo","", 25, 0, 20) ;
-  TH1F *histo1 = new TH1F("histo1","", 25, 0, 20) ;
-
-  // TH2D *h2wall = new TH2D ("wall","",  column_tot_number+2, -1, column_tot_number+1, row_tot_number+2, -1, row_tot_number+1) ;
-  // for (int i = 0; i < column_tot_number; ++i) {
-  //   for (int j = 0; j < row_tot_number; ++j) {
-  //     h2wall->SetBinContent(i+2,j+2,distance_OM(col,row,i,j)) ;
-  //   }
-  // }
 
 
-  bool flag = 1 ;
+
+double Create_norm_map(int col_source, int row_source, int col, int row){
+
+  int n_perimetre = 0. ;
+  int n_aire = 0. ;
+  TH1F *hperimetre = new TH1F("hperimetre","", 20, 0, 25) ;
+  TH1F *haire = new TH1F("haire","", 20, 0, 25) ;
+  TH2D *h2 = new TH2D ("h2","", column_tot_number+2, -1, column_tot_number+1, row_tot_number+2, -1, row_tot_number+1) ;
+  double distance = distance_OM(col_source,row_source,col,row) ;
+  TEllipse *circle = new TEllipse(col_source+0.5,row_source+0.5,distance);
   for (int i = 0; i < column_tot_number; ++i) {
     for (int j = 0; j < row_tot_number; ++j) {
 
-      flag = 1 ;
-
-      if (i == col) {
-        if (j == row+1) {
-          flag=0 ;
-        }
+      if (distance == distance_OM(col_source,row_source,i,j)) {
+        n_perimetre++ ;
+        h2->SetBinContent(i+2,j+2,1) ;
+        hperimetre->Fill(distance_OM(col_source,row_source,i,j)) ;
       }
-      if (i == col+1) {
-        if (j == row) {
-          flag=0 ;
-        }
-      }
-      if (i == col) {
-        if (j == row-1) {
-          flag=0 ;
-        }
-      }
-      if (i == col-1) {
-        if (j == row) {
-          flag=0 ;
-        }
+      if (distance > distance_OM(col_source,row_source,i,j)) {
+        n_aire++ ;
       }
 
-      if (flag) {
-        histo->Fill(distance_OM(col,row,i,j)) ;
-        //cout << i << " " << j << " " << col << " " << row << " " << distance_OM(col,row,i,j) << endl ;
-      }
     }
   }
 
+  cout << n_perimetre << " " << n_aire << endl ;
+  TCanvas *c = new TCanvas("c","c",10,10,2000,1000) ;
+  h2->Draw("colztext") ;
+  circle->SetFillColorAlpha(0,0) ;
+  circle->Draw("same") ;
 
-  histo->Scale(1./histo->GetMaximum()) ;
-
-  for (int i = 0; i < 26; ++i) {
-    if (histo->GetBinContent(i) != 0) {
-      histo1->SetBinContent(i,1./histo->GetBinContent(i)) ;
-    }
-    else {
-      histo1->SetBinContent(i,0) ;
-    }
-  }
-
-
-  // TCanvas *c = new TCanvas("c","c",10,10,2000,1000) ;
-
-  // histo1->Draw() ;  histo->Draw("same") ;
-  // histo1->SetLineColor(2) ;
-  // c->BuildLegend(0.617,0.775,0.977,0.98) ;
-
-  return histo ;
+  c->SaveAs("test.pdf") ;
+  return 1;
 
 }
+
+
+
+// TH1F* Create_norm_map(int col, int row){
+
+
+//   TH1F *hperimetre = new TH1F("hperimetre","", 20, 0, 25) ;
+//   TH1F *haire = new TH1F("haire","", 20, 0, 25) ;
+//   TH1F *hperimetre_ideal = new TH1F("hperimetre_ideal","", 20, 0, 25) ;
+//   TH1F *hperimetre_norm = new TH1F("hperimetre_norm","", 20, 0, 25) ;
+//   TH2D *h2_distance = new TH2D ("h2_distance","", column_tot_number+2, -1, column_tot_number+1, row_tot_number+2, -1, row_tot_number+1) ;
+
+//   int col_ideal = 9 ;
+//   int row_ideal = 6 ;
+
+//   bool flag = 1 ;
+//   for (int i = 0; i < column_tot_number; ++i) {
+//     for (int j = 0; j < row_tot_number; ++j) {
+
+//       // // pour retirer les plus proches voisins
+//       // flag = 1 ;
+
+//       // if (i == col) {
+//       //   if (j == row+1) {
+//       //     flag=0 ;
+//       //   }
+//       // }
+//       // if (i == col+1) {
+//       //   if (j == row) {
+//       //     flag=0 ;
+//       //   }
+//       // }
+//       // if (i == col) {
+//       //   if (j == row-1) {
+//       //     flag=0 ;
+//       //   }
+//       // }
+//       // if (i == col-1) {
+//       //   if (j == row) {
+//       //     flag=0 ;
+//       //   }
+//       // }
+
+//       if (flag) {
+//         hperimetre->Fill(distance_OM(col,row,i,j)) ;
+//         hperimetre_ideal->Fill(distance_OM(col_ideal,row_ideal,i,j)) ;
+//         h2_distance->SetBinContent(i+2,j+2,distance_OM(col,row,i,j)) ;
+//         cout << i << " " << j << " " << col_ideal << " " << row_ideal << " " << distance_OM(col_ideal,row_ideal,i,j) << endl ;
+
+//         for (int k = 0; k < distance_OM(col,row,i,j); ++k) {
+//           cout << distance_OM(col,row,i,j) << endl ;
+//         }
+
+
+//       }
+//     }
+//   }
+
+
+//   // histo->Scale(1./histo->GetMaximum()) ;
+
+//   // for (int i = 0; i < 26; ++i) {
+//   //   if (histo->GetBinContent(i) != 0) {
+//   //     hperimetre_norm->SetBinContent(i,1./histo->GetBinContent(i)) ;
+//   //   }
+//   //   else {
+//   //     hperimetre_norm->SetBinContent(i,0) ;
+//   //   }
+//   // }
+
+//   // hperimetre->Divide(hperimetre_ideal) ;
+
+//   TCanvas *c = new TCanvas("c","c",10,10,2000,1000) ;
+
+//   // h2_distance->Draw("COLZTEXT") ;
+//   hperimetre_ideal->Draw() ;
+//   hperimetre_ideal->SetLineColor(MultiPlotColors(0)) ;
+//   hperimetre->Draw("same") ;
+//   hperimetre->SetLineColor(MultiPlotColors(1)) ;
+
+//   TLine* line = new TLine(10,0,10,50) ;
+//   line->SetLineStyle(2) ;
+//   line->Draw("SAME") ;
+
+//   // hperimetre_norm->SetLineColor(2) ;
+//   c->BuildLegend(0.617,0.775,0.977,0.98) ;
+
+//   return hperimetre ;
+
+// }

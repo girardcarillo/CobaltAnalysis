@@ -464,10 +464,10 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
 
   TLine* line0 = new TLine(0.15,0,0.15,2.5) ;
   line0->SetLineStyle(3) ;
-  line0->SetLineWidth(1) ;
+  line0->SetLineWidth(2) ;
   TLine* line1 = new TLine(0,0.15,1.5,0.15) ;
   line1->SetLineStyle(3) ;
-  line1->SetLineWidth(1) ;
+  line1->SetLineWidth(2) ;
   TLine* line2 = new TLine(0.7,0,0.7,2.5) ;
   line2->SetLineStyle(7) ;
   line2->SetLineWidth(2) ;
@@ -475,7 +475,7 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
   line3->SetLineStyle(7) ;
   line3->SetLineWidth(2) ;
   h2energy->Scale(0.35) ; // pour simus 1e9 events
-  config_histo2D(h2energy, "", "Energy (MeV)","Energy (MeV)","COLZ") ;c3->SaveAs("plots_data/Emin_Emax.pdf") ;
+  config_histo2D(h2energy, "", "Energy Min (MeV)","Energy Max (MeV)","COLZ") ;c3->SaveAs("plots_data/Emin_Emax.pdf") ;
   h2energy->GetXaxis()->SetLabelSize(0.05);
   h2energy->GetXaxis()->SetTitleOffset(1.2);
   h2energy->GetYaxis()->SetLabelSize(0.05);
