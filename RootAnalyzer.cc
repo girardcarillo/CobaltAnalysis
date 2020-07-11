@@ -1,5 +1,6 @@
 // Author Cloé Girard-Carillo girardcarillo@lal.in2p3.fr
-
+// Main macro for Cobalt analysis
+// root 'RootAnalyzer.cc("Cut_root_files/data/60Co_runs/Cut_2e_runs_fr_centr_Calib.root",9,6,0.7,0.7,1,0)' -b -q
 #include <limits>
 #include <string>
 #include <iostream>
@@ -116,12 +117,17 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
   TH1F *hsigma = new TH1F("Fitted sigmas","",50, 0, 2) ;
 
   TH1F *hcoincidence[column_tot_number][row_tot_number] ;
-  // for (int i=0 ;i<column_tot_number ;i++) {
-  //   for (int j=0 ;j<row_tot_number ;j++) {
-  //     hcoincidence[i][j] = new TH1F(Form("coicidences between OMs [%d:%d]&[%d:%d] ",selected_column,selected_row,i,j),Form("coicidences between OMs [%d:%d]&[%d:%d]",selected_column,selected_row,i,j),100,-20,20) ;
-  //   }
-  // }
 
+  TH1F *henergy_spectrum_tmp_first[row_tot_number] ;
+  TH1F *henergy_spectrum_tmp_sec[row_tot_number] ;
+  TH1F *hampl_spectrum_tmp_first[row_tot_number] ;
+  TH1F *hampl_spectrum_tmp_sec[row_tot_number] ;
+  for (int i=0 ;i<row_tot_number ;i++) {
+    henergy_spectrum_tmp_first[i] = new TH1F("Total_energy_spectrum",Form("[%d:%d]&[%d:%d]",selected_column,selected_row,selected_column,i),25,0,2.5) ;
+    henergy_spectrum_tmp_sec[i] = new TH1F(Form("[%d:%d]&[%d:%d]",selected_column,selected_row,selected_column,i),Form("[%d:%d]&[%d:%d]",selected_column,selected_row,selected_column,i),25,0,2.5) ;
+    hampl_spectrum_tmp_first[i] = new TH1F("Total_amplitude_spectrum",Form("[%d:%d]&[%d:%d]",selected_column,selected_row,selected_column,i),25,-350,-50) ;
+    hampl_spectrum_tmp_sec[i] = new TH1F(Form("[%d:%d]&[%d:%d]",selected_column,selected_row,selected_column,i),Form("[%d:%d]&[%d:%d]",selected_column,selected_row,selected_column,i),25,-350,-50) ;
+  }
 
   vector <vector <vector <double> > > delta_times(column_tot_number) ;
   double counts[column_tot_number][row_tot_number] ;
@@ -147,9 +153,11 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
   int eff_energy = 0 ;
   int eff_square = 0 ;
 
+
   for (Long64_t i=0 ;i<theTree->GetEntries() ;i++) {
     theTree->GetEntry(i) ;
     if (i%1000000==0) cout << "event " << i << endl ;
+
 
     if (isnan(calo_energy->at(0)) || isnan(calo_energy->at(1))){
       continue ;
@@ -203,6 +211,7 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
       bool flag_neighbour = select_cross(calo_column,calo_row,calo_column->at(0),calo_row->at(0)) ;
 
 
+
       // Sélectionner un carré autour de l'OM de référence [selected_column:selected_row]
       // bool flag_square=0 ;
       // if (calo_column->at(0)>selected_column-3&&calo_column->at(0)<selected_column+3) {
@@ -235,16 +244,23 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
               }
 
               // test 28/05/20
-               h2energy->Fill(Emin,Emax) ;
+              h2energy->Fill(Emin,Emax) ;
 
               //tableau coïncidences
               int hit=-1 ;
               bool selected_PMT = select_PM(calo_column,calo_row,selected_column,selected_row,&hit) ;
+
               if (selected_PMT) {
 
-                if (calo_column->at(abs(hit-1)) == 0 && calo_row->at(abs(hit-1)) == 7) {
-                  cout << "test" << endl ;
+
+                // // test calib energy 06/07
+                if (calo_column->at(abs(hit-1)) == selected_column) {
+                  henergy_spectrum_tmp_first[calo_row->at(abs(hit-1))]->Fill(calo_energy->at(hit)) ;
+                  henergy_spectrum_tmp_sec[calo_row->at(abs(hit-1))]->Fill(calo_energy->at(abs(hit-1))) ;
+                  hampl_spectrum_tmp_first[calo_row->at(abs(hit-1))]->Fill(calo_peak->at(hit)) ;
+                  hampl_spectrum_tmp_sec[calo_row->at(abs(hit-1))]->Fill(calo_peak->at(abs(hit-1))) ;
                 }
+                // //
 
                 henergy_spectrum->Fill(calo_energy->at(hit)) ;
                 // henergy_spectrum->Fill(calo_energy->at(abs(hit-1))) ;
@@ -303,7 +319,8 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
     }
   }
 
-  cout << "total = " << counter_tot << " cut energy = " << eff_energy << " cut voisins = " << eff_square << endl ;
+
+  // cout << "total = " << counter_tot << " cut energy = " << eff_energy << " cut voisins = " << eff_square << endl ;
 
   double mean = 0. ;
   double median = 0. ;
@@ -364,7 +381,6 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
       else {
 
         if (j != 0 && j != 12) {// on retire les deux rangées du haut
-
 
 
           if (fit_parameters[0]!=0) {// in function FitDeltat fit_parameters are set to 0 if not
@@ -447,55 +463,55 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
     c2->SaveAs("plots_data/4_plots.pdf") ;
 
 
-  TCanvas *c3 = new TCanvas("c3", "c3",67,57,1500,1000);
-  gStyle->SetOptStat(0);
-  c3->Range(-0.8659958,-0.3510379,3.101165,2.612943);
-  c3->SetFillColor(0);
-  c3->SetBorderMode(0);
-  c3->SetBorderSize(2);
-  c3->SetLeftMargin(0.2182911);
-  c3->SetRightMargin(0.1515354);
-  c3->SetTopMargin(0.03810504);
-  c3->SetBottomMargin(0.1184346);
-  c3->SetFrameBorderMode(0);
-  c3->SetFrameBorderMode(0);
-  gStyle->SetPalette(20,python_viridis) ;
-  c3->SetLogz();
+    TCanvas *c3 = new TCanvas("c3", "c3",67,57,1500,1000);
+    gStyle->SetOptStat(0);
+    c3->Range(-0.8659958,-0.3510379,3.101165,2.612943);
+    c3->SetFillColor(0);
+    c3->SetBorderMode(0);
+    c3->SetBorderSize(2);
+    c3->SetLeftMargin(0.2182911);
+    c3->SetRightMargin(0.1515354);
+    c3->SetTopMargin(0.03810504);
+    c3->SetBottomMargin(0.1184346);
+    c3->SetFrameBorderMode(0);
+    c3->SetFrameBorderMode(0);
+    gStyle->SetPalette(20,python_viridis) ;
+    c3->SetLogz();
 
-  TLine* line0 = new TLine(0.15,0,0.15,2.5) ;
-  line0->SetLineStyle(3) ;
-  line0->SetLineWidth(2) ;
-  TLine* line1 = new TLine(0,0.15,1.5,0.15) ;
-  line1->SetLineStyle(3) ;
-  line1->SetLineWidth(2) ;
-  TLine* line2 = new TLine(0.7,0,0.7,2.5) ;
-  line2->SetLineStyle(7) ;
-  line2->SetLineWidth(2) ;
-  TLine* line3 = new TLine(0,0.7,1.5,0.7) ;
-  line3->SetLineStyle(7) ;
-  line3->SetLineWidth(2) ;
-  h2energy->Scale(0.35) ; // pour simus 1e9 events
-  config_histo2D(h2energy, "", "Energy Min (MeV)","Energy Max (MeV)","COLZ") ;c3->SaveAs("plots_data/Emin_Emax.pdf") ;
-  h2energy->GetXaxis()->SetLabelSize(0.05);
-  h2energy->GetXaxis()->SetTitleOffset(1.2);
-  h2energy->GetYaxis()->SetLabelSize(0.05);
-  h2energy->GetZaxis()->SetLabelSize(0.05);
-  h2energy->SetContour(99) ;
+    TLine* line0 = new TLine(0.15,0,0.15,2.5) ;
+    line0->SetLineStyle(3) ;
+    line0->SetLineWidth(2) ;
+    TLine* line1 = new TLine(0,0.15,1.5,0.15) ;
+    line1->SetLineStyle(3) ;
+    line1->SetLineWidth(2) ;
+    TLine* line2 = new TLine(0.7,0,0.7,2.5) ;
+    line2->SetLineStyle(7) ;
+    line2->SetLineWidth(2) ;
+    TLine* line3 = new TLine(0,0.7,1.5,0.7) ;
+    line3->SetLineStyle(7) ;
+    line3->SetLineWidth(2) ;
+    h2energy->Scale(0.72) ; // pour simus 1e9 events
+    config_histo2D(h2energy, "", "Energy Min (MeV)","Energy Max (MeV)","COLZ") ;c3->SaveAs("plots_data/Emin_Emax.pdf") ;
+    h2energy->GetXaxis()->SetLabelSize(0.05);
+    h2energy->GetXaxis()->SetTitleOffset(1.2);
+    h2energy->GetYaxis()->SetLabelSize(0.05);
+    h2energy->GetZaxis()->SetLabelSize(0.05);
+    h2energy->SetContour(99) ;
 
-  line0->Draw("SAME") ;
-  line1->Draw("SAME") ;
-  line2->Draw("SAME") ;
-  line3->Draw("SAME") ;
+    line0->Draw("SAME") ;
+    line1->Draw("SAME") ;
+    line2->Draw("SAME") ;
+    line3->Draw("SAME") ;
 
-  c3->SaveAs("plots_data/Emin_Emax.pdf") ;
+    c3->SaveAs("plots_data/Emin_Emax.pdf") ;
 
-  config_histo2D(h2counts, "Number of events in each PMT", "Column","Row","COLZTEXT") ;c3->SaveAs("plots_data/counts.pdf") ;
-  config_histo2D(h2energy_spectrum_one_PM,Form("Mean energie for each PM in coincidence with OM [%d:%d]", selected_column, selected_row), "Column","Row","COLZTEXT") ;c3->SaveAs("plots_data/energy_one_PM.pdf") ;
+    config_histo2D(h2counts, "", "Column","Row","COLZ") ;c3->SaveAs("plots_data/counts.pdf") ;
+    config_histo2D(h2energy_spectrum_one_PM,Form("Mean energie for each PM in coincidence with OM [%d:%d]", selected_column, selected_row), "Column","Row","COLZTEXT") ;c3->SaveAs("plots_data/energy_one_PM.pdf") ;
 
     // histogram for manuscrit thesis
     c3->cd() ;
     cout << "!scale for simus!!" << endl ;
-    hcounts_distance->Scale(3.5) ; // pour simus 10e8
+    // hcounts_distance->Scale(3.5) ; // pour simus 10e8
     hcounts_distance->SaveAs("BackgroundEstimation/tot_counts_distance.root") ;
     gStyle->SetOptStat(0);
     config_profile(hcounts_distance,"","Distance from source (a.u.)","#Counts","",2,MultiPlotColors(10)) ;
@@ -554,18 +570,101 @@ void RootAnalyzer(string filename/*,string correctedTimesFilename*/,int selected
   }
 
 
+  // // smearing energy for energy calib
+  // henergy_spectrum->SaveAs(Form("DetectorEfficiency/histograms/energy_spectrum_%1.1f.root",(double)smearing_energy)) ;
+  // henergy_spectrum_Emin->SaveAs(Form("DetectorEfficiency/histograms/energy_spectrum_Emin_%1.1f.root",(double)smearing_energy)) ;
+  // henergy_spectrum_Emax->SaveAs(Form("DetectorEfficiency/histograms/energy_spectrum_Emax_%1.1f.root",(double)smearing_energy)) ;
 
-  henergy_spectrum->SaveAs(Form("DetectorEfficiency/histograms/energy_spectrum_%d.root",(int)smearing_energy)) ;
-  henergy_spectrum_Emin->SaveAs(Form("DetectorEfficiency/histograms/energy_spectrum_Emin_%d.root",(int)smearing_energy)) ;
-  henergy_spectrum_Emax->SaveAs(Form("DetectorEfficiency/histograms/energy_spectrum_Emax_%d.root",(int)smearing_energy)) ;
 
-  hdeltat_ex->SaveAs(Form("DetectorEfficiency/DeltatAnalysis/deltat_%d-%d.root",selected_column,selected_row)) ;
-  h2mean->SaveAs(Form("DetectorEfficiency/MeanAnalysis/deltat_%d-%d.root",selected_column,selected_row)) ;
-  h2sigma->SaveAs(Form("DetectorEfficiency/SigmaAnalysis/deltat_%d-%d.root",selected_column,selected_row)) ;
+  // henergy_spectrum_tmp_first[9]->SaveAs(Form("DetectorEfficiency/EnergySmearing/energy_spectrum_%1.1f.root",(double)smearing_energy)) ;
 
-  theTree->ResetBranchAddresses() ;
-  SigmaFile.close() ;
-  EnergyFile.close() ;
+  // hdeltat_ex->SaveAs(Form("DetectorEfficiency/DeltatAnalysis/deltat_%d-%d.root",selected_column,selected_row)) ;
+  // h2mean->SaveAs(Form("DetectorEfficiency/MeanAnalysis/deltat_%d-%d.root",selected_column,selected_row)) ;
+  // h2sigma->SaveAs(Form("DetectorEfficiency/SigmaAnalysis/deltat_%d-%d.root",selected_column,selected_row)) ;
+
+  // // // test calib énergie 06/07/20
+  // gStyle->SetOptStat("e") ;
+  // TCanvas *ctest = new TCanvas("ctest", "ctest",67,57,1500,1000);
+  // ctest->Divide(4,4) ;
+  // for (int i = 0; i < row_tot_number; ++i) {
+  //   if (henergy_spectrum_tmp_first[i]->GetEntries() != 0) {
+
+  //     ctest->cd(i+1) ;
+
+  //     // scale for simus
+  //     henergy_spectrum_tmp_first[i]->Scale(0.72) ;
+  //     henergy_spectrum_tmp_sec[i]->Scale(0.72) ;
+  //     henergy_spectrum_tmp_first[i]->SetEntries(henergy_spectrum_tmp_first[i]->GetEntries()*0.72);
+  //     henergy_spectrum_tmp_sec[i]->SetEntries(henergy_spectrum_tmp_sec[i]->GetEntries()*0.72);
+
+  //     // set maximum histogram
+  //     int max_histo = -1 ;
+  //     if (henergy_spectrum_tmp_first[i]->GetMaximum() > henergy_spectrum_tmp_sec[i]->GetMaximum()) {
+  //       max_histo = henergy_spectrum_tmp_first[i]->GetMaximum() ;
+  //     }
+  //     else if (henergy_spectrum_tmp_first[i]->GetMaximum() <= henergy_spectrum_tmp_sec[i]->GetMaximum()) {
+  //       max_histo = henergy_spectrum_tmp_sec[i]->GetMaximum() ;
+  //     }
+
+  //     config_histo1D(henergy_spectrum_tmp_first[i],"HIST","Energy (MeV)","#counts",1,1,1) ;
+  //     config_histo1D(henergy_spectrum_tmp_sec[i],"HISTSAME","Energy (MeV)","#counts",1,1,2) ;
+  //     henergy_spectrum_tmp_first[i]->GetYaxis()->SetRangeUser(0,max_histo+.2*max_histo) ;
+
+  //     // set line at energy cut
+  //     TLine* ltest = new TLine(energy_cut_max,0,energy_cut_max,max_histo+.2*max_histo) ;
+  //     ltest->SetLineStyle(2) ;
+  //     ltest->SetLineColor(12) ;
+  //     ltest->Draw("SAME") ;
+
+  //   }
+  // }
+  // ctest->SaveAs(Form("spectres_energy_column_%d.pdf",selected_column)) ;
+  // // //
+
+  // // // test calib énergie 06/07/20 amplitude
+  // gStyle->SetOptStat("e") ;
+  // TCanvas *ctest = new TCanvas("ctest", "ctest",67,57,1500,1000);
+  // ctest->Divide(4,4) ;
+  // for (int i = 0; i < row_tot_number; ++i) {
+  //   if (hampl_spectrum_tmp_first[i]->GetEntries() != 0) {
+
+  //     ctest->cd(i+1) ;
+
+  //     // scale for simus
+  //     hampl_spectrum_tmp_first[i]->Scale(0.72) ;
+  //     hampl_spectrum_tmp_sec[i]->Scale(0.72) ;
+  //     hampl_spectrum_tmp_first[i]->SetEntries(hampl_spectrum_tmp_first[i]->GetEntries()*0.72);
+  //     hampl_spectrum_tmp_sec[i]->SetEntries(hampl_spectrum_tmp_sec[i]->GetEntries()*0.72);
+
+  //     // set maximum histogram
+  //     int max_histo = -1 ;
+  //     if (hampl_spectrum_tmp_first[i]->GetMaximum() > hampl_spectrum_tmp_sec[i]->GetMaximum()) {
+  //       max_histo = hampl_spectrum_tmp_first[i]->GetMaximum() ;
+  //     }
+  //     else if (hampl_spectrum_tmp_first[i]->GetMaximum() <= hampl_spectrum_tmp_sec[i]->GetMaximum()) {
+  //       max_histo = hampl_spectrum_tmp_sec[i]->GetMaximum() ;
+  //     }
+
+  //     config_histo1D(hampl_spectrum_tmp_first[i],"HIST","Energy (MeV)","#counts",1,1,1) ;
+  //     config_histo1D(hampl_spectrum_tmp_sec[i],"HISTSAME","Energy (MeV)","#counts",1,1,2) ;
+  //     hampl_spectrum_tmp_first[i]->GetYaxis()->SetRangeUser(0,max_histo+.2*max_histo) ;
+
+  //     // // set line at Compton edge
+  //     // TLine* ltest = new TLine(energy_cut_max,0,energy_cut_max,max_histo+.2*max_histo) ;
+  //     // ltest->SetLineStyle(2) ;
+  //     // ltest->SetLineColor(12) ;
+  //     // ltest->Draw("SAME") ;
+
+  //   }
+  // }
+
+  // ctest->SaveAs(Form("spectres_ampl_column_%d.pdf",selected_column)) ;
+  // // //
+
+
+    theTree->ResetBranchAddresses() ;
+    SigmaFile.close() ;
+    EnergyFile.close() ;
 }
 
 

@@ -1,5 +1,5 @@
 // Author Cloé Girard-Carillo girardcarillo@lal.in2p3.fr
-
+// macro to draw two 1d histograms (data + simus) in same canvas: files sigma_i_j.root
 #include <limits>
 #include <string>
 #include <iostream>
